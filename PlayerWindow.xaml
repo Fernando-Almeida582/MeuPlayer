@@ -1,0 +1,73 @@
+<Window x:Class="MeuPlayer.PlayerWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Meu Player"
+ WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
+ ShowInTaskbar="False" ShowActivated="False" Topmost="True" SizeToContent="WidthAndHeight"
+ UseLayoutRounding="True" FontFamily="Segoe UI">
+  <Window.Resources>
+    <Style TargetType="Button">
+      <Setter Property="Width" Value="26"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Height" Value="28"/>
+      <Setter Property="Foreground" Value="{DynamicResource PlayerText}"/>
+      <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Surface" CornerRadius="5" Background="{TemplateBinding Background}">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <MultiTrigger>
+                <MultiTrigger.Conditions>
+                  <Condition Property="IsEnabled" Value="True"/>
+                  <Condition Property="IsMouseOver" Value="True"/>
+                </MultiTrigger.Conditions>
+                <Setter TargetName="Surface" Property="Background" Value="{DynamicResource PlayerHover}"/>
+              </MultiTrigger>
+              <MultiTrigger>
+                <MultiTrigger.Conditions>
+                  <Condition Property="IsEnabled" Value="True"/>
+                  <Condition Property="IsPressed" Value="True"/>
+                </MultiTrigger.Conditions>
+                <Setter TargetName="Surface" Property="Background" Value="{DynamicResource PlayerPress}"/>
+              </MultiTrigger>
+              <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.38"/></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </Window.Resources>
+  <Border x:Name="Frame" Background="#F01B222C" BorderBrush="#465C6C80" BorderThickness="1"
+          CornerRadius="8" Padding="5,2" MouseLeftButtonDown="Drag">
+    <StackPanel x:Name="Layout" Orientation="Horizontal">
+      <StackPanel x:Name="Media" Orientation="Horizontal" VerticalAlignment="Center">
+        <StackPanel x:Name="Transport" Orientation="Horizontal" VerticalAlignment="Center">
+          <Button x:Name="Previous" Content="&#xE892;" ToolTip="Anterior" AutomationProperties.Name="Anterior" Click="GoPrevious" IsEnabled="False"/>
+          <Button x:Name="Play" Content="&#xE768;" ToolTip="Reproduzir" AutomationProperties.Name="Reproduzir" Click="TogglePlayback" IsEnabled="False"/>
+          <Button x:Name="Next" Content="&#xE893;" ToolTip="Próxima" AutomationProperties.Name="Próxima" Click="GoNext" IsEnabled="False"/>
+        </StackPanel>
+        <Button x:Name="OpenSource" Width="Auto" Height="Auto" Opacity="1" FontFamily="Segoe UI"
+                IsEnabled="False" Click="OpenMediaSource" AutomationProperties.Name="Abrir aplicativo ou aba da mídia"
+                PreviewMouseLeftButtonDown="StartMediaGesture" PreviewMouseMove="MoveMediaGesture"
+                PreviewMouseLeftButtonUp="EndMediaGesture">
+          <StackPanel x:Name="MediaInfo" Orientation="Horizontal">
+            <Border x:Name="ArtworkFrame" Width="27" Height="27" Margin="4,0" CornerRadius="4" ClipToBounds="True" Background="#465466">
+              <Grid>
+                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8D6;" Foreground="{DynamicResource PlayerDetail}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <Image x:Name="Cover" Stretch="UniformToFill"/>
+              </Grid>
+            </Border>
+            <StackPanel x:Name="MediaText" Width="143" Margin="3,0,5,0" VerticalAlignment="Center">
+              <TextBlock x:Name="Track" Foreground="{DynamicResource PlayerText}" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="Sem mídia ativa"/>
+              <TextBlock x:Name="Artist" Foreground="{DynamicResource PlayerDetail}" FontSize="10" TextTrimming="CharacterEllipsis" Text="Meu Player"/>
+            </StackPanel>
+          </StackPanel>
+        </Button>
+      </StackPanel>
+      <WrapPanel x:Name="Battery" Orientation="Horizontal" Margin="4,0" VerticalAlignment="Center" Visibility="Collapsed"/>
+    </StackPanel>
+  </Border>
+</Window>
