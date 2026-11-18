@@ -315,7 +315,7 @@ public partial class PlayerWindow : Window
 
     private void RefreshBattery()
     {
-        if (batteries.Changes() is { } devices) ShowBatteries(devices);
+        if (batteryVisible && batteries.Changes() is { } devices) ShowBatteries(devices);
     }
 
     private void ShowBatteries(IReadOnlyList<PeripheralBattery.Reading> devices)
@@ -325,8 +325,8 @@ public partial class PlayerWindow : Window
         if (devices.Count == 0)
         {
             AddBattery("\uE83F", "—", batteryUnavailable
-                ? "Leitura de bateria Bluetooth indisponível"
-                : "Aguardando um dispositivo Bluetooth conectado");
+                ? "Leitura de bateria de dispositivos indisponível"
+                : "Aguardando um dispositivo com bateria compatível");
             return;
         }
 

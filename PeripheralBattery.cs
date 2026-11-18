@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using Windows.Devices.Bluetooth;
 using Windows.Devices.Enumeration;
 
@@ -27,6 +28,9 @@ internal sealed class PeripheralBattery : IDisposable
     private readonly List<DeviceWatcher> watchers = new();
     private readonly Dictionary<string, DeviceInformation> nodes = new();
     private readonly Dictionary<string, DeviceInformation> endpoints = new();
+    private UsbHidBattery.Candidate[] usbDevices = [];
+    private long nextUsbScan;
+    private bool scanningUsb;
     private bool changed = true;
     private bool disposed;
 
@@ -73,11 +77,37 @@ internal sealed class PeripheralBattery : IDisposable
         watcher.Start();
     }
 
+    private void ScheduleUsbScan()
+    {
+        if (scanningUsb || Environment.TickCount64 < nextUsbScan) return;
+        scanningUsb = true;
+        nextUsbScan = Environment.TickCount64 + 30_000;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var snapshot = await UsbHidBattery.Scan().ConfigureAwait(false);
+                lock (gate)
+                {
+                    if (!disposed && !usbDevices.SequenceEqual(snapshot))
+                    {
+                        usbDevices = snapshot;
+                        changed = true;
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is COMException or UnauthorizedAccessException or InvalidOperationException or ArgumentException) { }
+            finally { lock (gate) scanningUsb = false; }
+        });
+    }
+
     internal Reading[]? Changes()
     {
         lock (gate)
         {
-            if (!changed || disposed) return null;
+            if (disposed) return null;
+            ScheduleUsbScan();
+            if (!changed) return null;
             changed = false;
             var levels = new Dictionary<Guid, int>();
             foreach (var device in nodes.Values)
@@ -86,7 +116,7 @@ internal sealed class PeripheralBattery : IDisposable
                     levels.TryAdd(id, percent);
             }
 
-            return endpoints.Values
+            var bluetooth = endpoints.Values
                 .Where(device => device.Properties.TryGetValue(Connected, out var connected) && connected is true)
                 .Where(device => Container(device, EndpointContainer).HasValue)
                 .GroupBy(device => Container(device, EndpointContainer)!.Value)
@@ -94,9 +124,31 @@ internal sealed class PeripheralBattery : IDisposable
                     group.Select(device => device.Name).FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? "Dispositivo Bluetooth",
                     levels.TryGetValue(group.Key, out int percent) ? percent : null,
                     group.Select(Glyph).FirstOrDefault(glyph => glyph != null) ?? "\uE702"))
+                .ToArray();
+
+            var bluetoothIds = endpoints.Values.Select(device => Container(device, EndpointContainer)).ToHashSet();
+            return bluetooth.Concat(MergeUsbReadings(usbDevices, levels, bluetoothIds))
                 .OrderByDescending(device => device.Percent.HasValue)
                 .ThenBy(device => device.Name, StringComparer.CurrentCultureIgnoreCase)
                 .ToArray();
+        }
+    }
+
+    private static IEnumerable<Reading> MergeUsbReadings(IEnumerable<UsbHidBattery.Candidate> candidates,
+        IReadOnlyDictionary<Guid, int> windowsLevels, IReadOnlySet<Guid?> bluetoothIds)
+    {
+        foreach (var group in candidates.GroupBy(item => item.Container))
+        {
+            if (bluetoothIds.Contains(group.Key)) continue;
+            var reported = group.FirstOrDefault(item => item.Percent.HasValue);
+            int? percent = windowsLevels.TryGetValue(group.Key, out int level) ? level : reported?.Percent;
+            if (!percent.HasValue) continue;
+
+            string name = reported?.Name ?? group.First().Name;
+            if (string.IsNullOrWhiteSpace(name)) name = "Dispositivo HID USB";
+            string glyph = reported?.Glyph ?? group.Select(item => item.Glyph).FirstOrDefault(item => item is not null) ??
+                GlyphFromName(name) ?? "\uE88E";
+            yield return new Reading(name + " (USB)", percent, glyph);
         }
     }
 
@@ -129,7 +181,12 @@ internal sealed class PeripheralBattery : IDisposable
             case 5 when (minor & 16) == 16: return "\uE765";
         }
 
-        string name = device.Name.ToLowerInvariant();
+        return GlyphFromName(device.Name);
+    }
+
+    private static string? GlyphFromName(string deviceName)
+    {
+        string name = deviceName.ToLowerInvariant();
         if (Contains(name, "head", "fone", "bud", "airpod", "earphone", "wh-", "wf-")) return "\uE7F6";
         if (Contains(name, "speaker", "alto-falante", "caixa de som")) return "\uE7F5";
         if (Contains(name, "keyboard", "teclado")) return "\uE765";
@@ -145,6 +202,7 @@ internal sealed class PeripheralBattery : IDisposable
         lock (gate)
         {
             disposed = true;
+            usbDevices = [];
             nodes.Clear();
             endpoints.Clear();
         }
