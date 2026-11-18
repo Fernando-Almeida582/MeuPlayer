@@ -317,3 +317,11 @@ internal static class MediaSource
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
     private static extern int GetApplicationUserModelId(nint process, ref uint length, StringBuilder id);
 }
+
+
+
+
+
+
+
+

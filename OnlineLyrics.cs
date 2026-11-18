@@ -18,7 +18,7 @@ internal static class OnlineLyrics
             Timeout = TimeSpan.FromSeconds(7),
             MaxResponseContentBufferSize = 1024 * 1024
         };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("MeuPlayer/1.4.3 (+https://github.com/Fernando-Almeida582/MeuPlayer)");
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("MeuPlayer/1.4.11 (+https://github.com/Fernando-Almeida582/MeuPlayer)");
         return client;
     });
 
@@ -45,3 +45,14 @@ internal static class OnlineLyrics
         return await JsonSerializer.DeserializeAsync<Result>(content, cancellationToken: token).ConfigureAwait(false);
     }
 }
+
+
+
+
+
+
+
+
+
+
+

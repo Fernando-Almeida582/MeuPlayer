@@ -1,4 +1,4 @@
-# Meu Player 1.4.3
+# Meu Player 1.4.11
 
 Widget de mídia para Windows 10 e 11. Controla a sessão de mídia ativa exposta ao sistema por aplicativos como Spotify e navegadores. A interface mostra faixa, artista e capa quando o aplicativo disponibiliza esses dados.
 
@@ -19,6 +19,12 @@ Em **Tema → Adaptativo**, o widget usa as cores da capa atual para escolher o 
 ## Voltar para a mídia
 
 Clique na capa ou no título para trazer a janela do aplicativo de origem para frente. Se a mídia estiver em um navegador compatível, o widget procura uma aba aberta com o mesmo título. Quando o título do anúncio não coincide com o do vídeo, o widget tenta localizar a aba do YouTube pelo indicador de reprodução de áudio. Se houver dúvida sobre a aba, ele traz a janela do navegador para frente. A busca usa os nomes acessíveis das abas abertas e acontece apenas ao clicar. Não instala extensão, não grava os nomes das abas e não abre links nem faz buscas na internet.
+
+No menu **Posição**, escolha **Fixar à esquerda** ou **Fixar à direita**. A preferência vale para os monitores conectados.
+
+## Espaço na barra de tarefas
+
+O modo fixo consulta os limites acessíveis dos botões e do relógio de cada barra em segundo plano, a cada três segundos. O título é encurtado para o espaço disponível. Quando não há espaço suficiente para os controles e as baterias, o widget fica logo acima da barra. A medição é uma estimativa baseada na interface acessível do Windows.
 
 ## Escolher a posição da mídia
 
@@ -47,3 +53,28 @@ dotnet publish .\MeuPlayer.csproj -c Release --self-contained false -o .\publica
 ```
 
 O executável e os arquivos de suporte ficam juntos na pasta **publicacao**.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

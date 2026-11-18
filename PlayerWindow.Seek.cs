@@ -92,3 +92,4 @@ public partial class PlayerWindow
         seekFlyout?.Refresh(session?.SourceAppUserModelId, metadata?.Title, timeline);
     }
 }
+

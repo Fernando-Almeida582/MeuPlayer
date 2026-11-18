@@ -11,6 +11,7 @@ internal sealed class PlayerPreferences
     public bool Behind { get; set; }
     public bool MediaVisible { get; set; } = true;
     public bool BatteryVisible { get; set; } = true;
+    public bool DockRight { get; set; }
     public bool ShowTrackLyrics { get; set; }
     public bool HideInFullScreen { get; set; }
     public int Theme { get; set; }
@@ -44,3 +45,7 @@ internal sealed class PlayerPreferences
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 }
+
+
+
+

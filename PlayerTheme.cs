@@ -88,3 +88,4 @@ internal record PlayerTheme(string Name, uint Surface, uint Border, uint Text, u
         return brush;
     }
 }
+

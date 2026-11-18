@@ -89,3 +89,4 @@ internal sealed partial class TimedLyrics
         return low - 1;
     }
 }
+

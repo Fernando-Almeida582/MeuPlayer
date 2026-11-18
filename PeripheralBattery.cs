@@ -219,3 +219,4 @@ internal sealed class PeripheralBattery : IDisposable
         watchers.Clear();
     }
 }
+

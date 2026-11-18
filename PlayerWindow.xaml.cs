@@ -48,6 +48,11 @@ public partial class PlayerWindow : Window
     private PlayerWindow(PlayerWindow? controller, Native.Display? display)
     {
         InitializeComponent();
+        ContextMenuOpening += (_, _) =>
+        {
+            (controller ?? this).seekFlyout?.Close();
+            if (window != 0) FocusContextMenu(window);
+        };
         this.controller = controller;
         this.display = display;
         preferences = controller?.preferences ?? PlayerPreferences.Load();
@@ -81,7 +86,7 @@ public partial class PlayerWindow : Window
             tray.Dispose();
             trayMenu.Dispose();
         };
-        layoutTimer.Tick += (_, _) => { Place(); RefreshDisplays(); };
+        layoutTimer.Tick += (_, _) => { if (!HasOpenMenu()) { Place(); RefreshDisplays(); } };
         mediaTimer.Tick += async (_, _) => await RefreshMedia();
         batteryTimer.Tick += (_, _) => RefreshBattery();
         ApplyMenu();
@@ -390,7 +395,7 @@ public partial class PlayerWindow : Window
 
     private void Place()
     {
-        if (window == 0 || !IsLoaded) return;
+        if (window == 0 || !IsLoaded || HasOpenMenu()) return;
         screen = display is { } target ? (target.Bounds, target.Work) : Native.MainScreen();
         if (screen is not { } area) return;
 
@@ -411,7 +416,26 @@ public partial class PlayerWindow : Window
 
         if (!floating)
         {
-            Native.KeepDockVisible(window, area.Bounds, area.Work, width, height, dpi.DpiScaleX, display?.Handle ?? 0);
+            double preferredText = lyricLine is null ? 143 : 235;
+            double fixedWidth = Frame.Padding.Left + Frame.Padding.Right + Frame.BorderThickness.Left + Frame.BorderThickness.Right;
+            if (mediaVisible)
+                fixedWidth += Transport.DesiredSize.Width + ArtworkFrame.DesiredSize.Width +
+                    MediaText.Margin.Left + MediaText.Margin.Right;
+            if (batteryVisible) fixedWidth += Battery.DesiredSize.Width;
+            int requested = (int)Math.Ceiling((fixedWidth + (mediaVisible ? preferredText : 0)) * dpi.DpiScaleX);
+            int minimum = (int)Math.Ceiling((fixedWidth + (mediaVisible ? 55 : 0)) * dpi.DpiScaleX);
+            nint taskbar = Native.TaskbarOn(display?.Handle ?? 0);
+            var slot = area.Work.Bottom < area.Bounds.Bottom
+                ? TaskbarSpace.Available(taskbar, area.Bounds, requested, minimum, (int)(8 * dpi.DpiScaleX), preferences.DockRight) : null;
+            double textWidth = mediaVisible && slot is { } space
+                ? Math.Min(preferredText, Math.Max(55, space.Width / dpi.DpiScaleX - fixedWidth)) : preferredText;
+            if (MediaText.Width != textWidth)
+            {
+                MediaText.Width = textWidth;
+                UpdateLayout();
+                width = (int)Math.Ceiling(ActualWidth * dpi.DpiScaleX);
+            }
+            Native.KeepDockVisible(window, area.Bounds, area.Work, width, height, dpi.DpiScaleX, display?.Handle ?? 0, slot, preferences.DockRight);
         }
         else if (floatingPosition is { } position)
         {
@@ -423,6 +447,14 @@ public partial class PlayerWindow : Window
             floatingPosition = null;
         }
 
+    }
+
+    private void SetDockSide(bool right)
+    {
+        preferences.DockRight = right;
+        if (floating) SetFloating(false);
+        else ApplyMenu();
+        SavePreferences();
     }
 
     private void SetFloating(bool enabled)
@@ -552,7 +584,8 @@ public partial class PlayerWindow : Window
     [
         new("Posição", Children:
         [
-            new("Fixo na barra de tarefas", !floating, () => SetFloating(false)),
+            new("Fixar à esquerda", !floating && !preferences.DockRight, () => SetDockSide(false)),
+            new("Fixar à direita", !floating && preferences.DockRight, () => SetDockSide(true)),
             new("Solto na tela (arrastar)", floating, () => SetFloating(true)),
             new("Layout vertical (solto)", vertical, () => ChangeOption(() => vertical = !vertical), floating),
             new("Atrás das janelas (solto)", behind, () => ChangeOption(() => behind = !behind), floating)
@@ -597,28 +630,87 @@ public partial class PlayerWindow : Window
         foreach (var copy in additionalDisplays.Values) copy.BuildWindowMenu(options);
     }
 
+    private bool HasOpenMenu()
+    {
+        var root = controller ?? this;
+        return root.ContextMenu?.IsOpen == true || root.trayMenu?.Visible == true ||
+            root.additionalDisplays.Values.Any(copy => copy.ContextMenu?.IsOpen == true);
+    }
+
     private void BuildWindowMenu(Option[] options)
     {
-        ContextMenu ??= new System.Windows.Controls.ContextMenu();
+        if (ContextMenu is null)
+        {
+            ContextMenu = new System.Windows.Controls.ContextMenu();
+            ContextMenu.Opened += (_, _) =>
+            {
+                (controller ?? this).seekFlyout?.Close();
+            };
+        }
         ContextMenu.Items.Clear();
         foreach (var option in options) ContextMenu.Items.Add(WindowOption(option));
     }
+
+
+    [DllImport("user32.dll", EntryPoint = "SetForegroundWindow")]
+    private static extern bool FocusContextMenu(nint handle);
 
     private static System.Windows.Controls.MenuItem WindowOption(Option option)
     {
         var item = new System.Windows.Controls.MenuItem { Header = option.Label, IsChecked = option.Checked, IsEnabled = option.Enabled };
         if (option.Children is { } children)
+        {
             foreach (var child in children) item.Items.Add(WindowOption(child));
+            MenuPlacement.Configure(item);
+        }
         if (option.Run is { } run) item.Click += (_, _) => run();
         return item;
     }
 
-    private static Forms.ToolStripMenuItem TrayOption(Option option)
+    private Forms.ToolStripMenuItem TrayOption(Option option)
     {
         var item = new Forms.ToolStripMenuItem(option.Label) { Checked = option.Checked, Enabled = option.Enabled };
         if (option.Children is { } children)
+        {
             foreach (var child in children) item.DropDownItems.Add(TrayOption(child));
+        }
         if (option.Run is { } run) item.Click += (_, _) => run();
         return item;
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

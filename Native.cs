@@ -63,7 +63,7 @@ internal static class Native
         return displays;
     }
 
-    private static nint TaskbarOn(nint monitor)
+    internal static nint TaskbarOn(nint monitor)
     {
         if (monitor == 0 || monitor == MonitorFromPoint(0, 1)) return FindWindow("Shell_TrayWnd", 0);
         nint bar = 0;
@@ -151,10 +151,12 @@ internal static class Native
         return (work.Left + margin, work.Bottom - height - margin);
     }
 
-    internal static void KeepDockVisible(nint window, Rect screen, Rect work, int width, int height, double scale, nint monitor)
+    internal static void KeepDockVisible(nint window, Rect screen, Rect work, int width, int height, double scale, nint monitor, TaskbarSpace.Slot? slot = null, bool right = false)
     {
         nint taskbar = TaskbarOn(monitor);
         var (x, y) = Dock(screen, work, width, height, scale, taskbar);
+        if (right) x = screen.Right - width - (int)(8 * scale);
+        if (slot is { } available) x = available.X;
         var (safeX, safeY) = InsideWorkArea(work, x, y, width, height, Math.Max(2, (int)(4 * scale)));
         const int cloakedAttribute = 14;
         nint foreground = GetForegroundWindow();
@@ -167,7 +169,7 @@ internal static class Native
             return;
         }
 
-        PresentDocked(window, x, y);
+        PresentDocked(window, slot is null ? safeX : x, slot is null ? safeY : y);
         if (taskbar != 0 && CoveredByWindow(window, taskbar))
             PresentDocked(window, safeX, safeY);
     }
@@ -208,3 +210,18 @@ internal static class Native
 
     internal static void Move(nint window, int x, int y) => SetWindowPos(window, 0, x, y, 0, 0, 0x15);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
