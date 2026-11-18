@@ -70,6 +70,8 @@ public partial class PlayerWindow
     private void CopyDisplayState()
     {
         var source = controller!;
+        lyricTrackKey = source.lyricTrackKey;
+        preferredLyricWidth = source.preferredLyricWidth;
         trackTitle = source.trackTitle;
         if (lyricLine != source.lyricLine) ShowLyricLine(source.lyricLine);
         Track.Text = source.Track.Text;

@@ -416,12 +416,13 @@ public partial class PlayerWindow : Window
 
         if (!floating)
         {
-            double preferredText = lyricLine is null ? 143 : 235;
+            double preferredText = lyricLine is null ? 143 : preferredLyricWidth;
             double fixedWidth = Frame.Padding.Left + Frame.Padding.Right + Frame.BorderThickness.Left + Frame.BorderThickness.Right;
             if (mediaVisible)
                 fixedWidth += Transport.DesiredSize.Width + ArtworkFrame.DesiredSize.Width +
                     MediaText.Margin.Left + MediaText.Margin.Right;
             if (batteryVisible) fixedWidth += Battery.DesiredSize.Width;
+            preferredText = Math.Min(preferredText, Math.Max(55, (area.Work.Right - area.Work.Left) / dpi.DpiScaleX - fixedWidth - 16));
             int requested = (int)Math.Ceiling((fixedWidth + (mediaVisible ? preferredText : 0)) * dpi.DpiScaleX);
             int minimum = (int)Math.Ceiling((fixedWidth + (mediaVisible ? 55 : 0)) * dpi.DpiScaleX);
             nint taskbar = Native.TaskbarOn(display?.Handle ?? 0);

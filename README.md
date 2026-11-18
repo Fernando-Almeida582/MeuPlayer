@@ -1,4 +1,6 @@
-# Meu Player 1.4.11
+# Meu Player 1.4.13
+
+Baseada na edição executável 1.4.11. No modo fixo, a área da letra expande conforme a largura do texto e o espaço livre da barra de tarefas, respeitando os botões e o relógio. A maior largura necessária é mantida durante a faixa para evitar saltos a cada verso e reiniciada ao mudar de faixa. Quando o espaço é insuficiente, a letra continua com reticências. Cada monitor respeita seu próprio espaço disponível. O layout flutuante permanece com sua largura habitual.
 
 Widget de mídia para Windows 10 e 11. Controla a sessão de mídia ativa exposta ao sistema por aplicativos como Spotify e navegadores. A interface mostra faixa, artista e capa quando o aplicativo disponibiliza esses dados.
 
