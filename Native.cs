@@ -13,12 +13,16 @@ internal static class Native
 
     [StructLayout(LayoutKind.Sequential)]
     private struct MonitorInfo { public uint Size; public Rect Bounds, Work; public uint Flags; }
+    internal record Display(nint Handle, Rect Bounds, Rect Work, bool Primary);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct Point { public int X, Y; }
 
     [DllImport("user32.dll")] private static extern nint MonitorFromPoint(long point, uint flags);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern bool GetMonitorInfo(nint monitor, ref MonitorInfo info);
+    private delegate bool MonitorCallback(nint monitor, nint dc, nint bounds, nint data);
+    [DllImport("user32.dll")] private static extern bool EnumDisplayMonitors(nint dc, nint clip, MonitorCallback callback, nint data);
+    [DllImport("user32.dll")] private static extern nint MonitorFromWindow(nint window, uint flags);
     [DllImport("user32.dll")] internal static extern nint GetForegroundWindow();
     [DllImport("user32.dll")] private static extern nint GetShellWindow();
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern nint FindWindow(string className, nint name);
@@ -44,6 +48,28 @@ internal static class Native
     {
         var info = new MonitorInfo { Size = (uint)Marshal.SizeOf<MonitorInfo>() };
         return GetMonitorInfo(MonitorFromPoint(0, 1), ref info) ? (info.Bounds, info.Work) : null;
+    }
+
+    internal static System.Collections.Generic.List<Display> Displays()
+    {
+        var displays = new System.Collections.Generic.List<Display>();
+        EnumDisplayMonitors(0, 0, (monitor, _, _, _) =>
+        {
+            var info = new MonitorInfo { Size = (uint)Marshal.SizeOf<MonitorInfo>() };
+            if (GetMonitorInfo(monitor, ref info))
+                displays.Add(new Display(monitor, info.Bounds, info.Work, (info.Flags & 1) != 0));
+            return true;
+        }, 0);
+        return displays;
+    }
+
+    private static nint TaskbarOn(nint monitor)
+    {
+        if (monitor == 0 || monitor == MonitorFromPoint(0, 1)) return FindWindow("Shell_TrayWnd", 0);
+        nint bar = 0;
+        while ((bar = FindWindowEx(0, bar, "Shell_SecondaryTrayWnd", 0)) != 0)
+            if (MonitorFromWindow(bar, 2) == monitor) return bar;
+        return 0;
     }
 
     internal static bool FullScreenOn(nint ownWindow, Rect screen) =>
@@ -99,7 +125,7 @@ internal static class Native
         return Environment.OSVersion.Version.Build < 22000;
     }
 
-    internal static (int X, int Y) Dock(Rect screen, Rect work, int width, int height, double scale)
+    internal static (int X, int Y) Dock(Rect screen, Rect work, int width, int height, double scale, nint taskbar)
     {
         int margin = (int)(8 * scale);
         if (work.Bottom < screen.Bottom)
@@ -107,10 +133,11 @@ internal static class Native
             int x = screen.Left + margin;
             if (LeftAligned())
             {
-                nint taskbar = FindWindow("Shell_TrayWnd", 0);
                 nint tray = taskbar == 0 ? 0 : FindWindowEx(taskbar, 0, "TrayNotifyWnd", 0);
                 if (tray != 0 && GetWindowRect(tray, out var rect) && rect.Left >= screen.Left + width + margin)
                     x = rect.Left - width - margin;
+                else if (taskbar != 0 && taskbar != FindWindow("Shell_TrayWnd", 0))
+                    x = Math.Max(x, screen.Right - width - (int)(125 * scale));
                 else
                     return (x, work.Bottom - height - margin);
             }
@@ -124,22 +151,23 @@ internal static class Native
         return (work.Left + margin, work.Bottom - height - margin);
     }
 
-    internal static void KeepDockVisible(nint window, Rect screen, Rect work, int width, int height, double scale)
+    internal static void KeepDockVisible(nint window, Rect screen, Rect work, int width, int height, double scale, nint monitor)
     {
-        var (x, y) = Dock(screen, work, width, height, scale);
+        nint taskbar = TaskbarOn(monitor);
+        var (x, y) = Dock(screen, work, width, height, scale, taskbar);
         var (safeX, safeY) = InsideWorkArea(work, x, y, width, height, Math.Max(2, (int)(4 * scale)));
         const int cloakedAttribute = 14;
         nint foreground = GetForegroundWindow();
         bool foregroundIsVisible = IsWindowVisible(foreground) &&
             (DwmGetWindowAttribute(foreground, cloakedAttribute, out uint cloaked, sizeof(uint)) != 0 || cloaked == 0);
-        if (foregroundIsVisible && IsStartSurface(foreground))
+        if (foregroundIsVisible && IsStartSurface(foreground) &&
+            MonitorFromWindow(foreground, 2) == (monitor == 0 ? MonitorFromPoint(0, 1) : monitor))
         {
             PresentDocked(window, safeX, safeY);
             return;
         }
 
         PresentDocked(window, x, y);
-        nint taskbar = FindWindow("Shell_TrayWnd", 0);
         if (taskbar != 0 && CoveredByWindow(window, taskbar))
             PresentDocked(window, safeX, safeY);
     }

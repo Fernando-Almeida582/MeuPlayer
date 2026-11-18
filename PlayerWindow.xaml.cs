@@ -23,8 +23,8 @@ public partial class PlayerWindow : Window
     private readonly DispatcherTimer mediaTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly DispatcherTimer batteryTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
     private readonly PeripheralBattery batteries = new();
-    private readonly Forms.NotifyIcon tray;
-    private readonly Forms.ContextMenuStrip trayMenu = new();
+    private readonly Forms.NotifyIcon? tray;
+    private readonly Forms.ContextMenuStrip? trayMenu;
     private GlobalSystemMediaTransportControlsSessionManager? manager;
     private nint window;
     private bool floating, vertical, behind, mediaVisible = true, batteryVisible = true, closed;
@@ -43,10 +43,20 @@ public partial class PlayerWindow : Window
     private (Native.Rect Bounds, Native.Rect Work)? screen;
     private bool batteryUnavailable;
 
-    public PlayerWindow()
+    public PlayerWindow() : this(null, null) { }
+
+    private PlayerWindow(PlayerWindow? controller, Native.Display? display)
     {
         InitializeComponent();
-        preferences = PlayerPreferences.Load();
+        this.controller = controller;
+        this.display = display;
+        preferences = controller?.preferences ?? PlayerPreferences.Load();
+        if (controller is not null)
+        {
+            CopyDisplaySettings();
+            CopyDisplayState();
+            return;
+        }
         preferences.Theme = Math.Clamp(preferences.Theme, 0, PlayerTheme.All.Length - 1);
         floating = preferences.Floating;
         vertical = preferences.Vertical;
@@ -54,6 +64,7 @@ public partial class PlayerWindow : Window
         batteryVisible = preferences.BatteryVisible;
         mediaVisible = preferences.MediaVisible || !batteryVisible;
         floatingPosition = preferences.X is int x && preferences.Y is int y ? (x, y) : null;
+        trayMenu = new Forms.ContextMenuStrip();
         tray = new Forms.NotifyIcon { Icon = System.Drawing.SystemIcons.Application, Text = "Meu Player", ContextMenuStrip = trayMenu };
         tray.DoubleClick += (_, _) => SetFloating(!floating);
 
@@ -63,11 +74,12 @@ public partial class PlayerWindow : Window
             layoutTimer.Stop();
             mediaTimer.Stop();
             batteryTimer.Stop();
+            CloseAdditionalDisplays();
             batteries.Dispose();
             tray.Dispose();
             trayMenu.Dispose();
         };
-        layoutTimer.Tick += (_, _) => Place();
+        layoutTimer.Tick += (_, _) => { Place(); RefreshDisplays(); };
         mediaTimer.Tick += async (_, _) => await RefreshMedia();
         batteryTimer.Tick += (_, _) => RefreshBattery();
         ApplyMenu();
@@ -78,7 +90,7 @@ public partial class PlayerWindow : Window
         base.OnSourceInitialized(e);
         window = new WindowInteropHelper(this).Handle;
         Native.SetToolWindow(window);
-        screen = Native.MainScreen();
+        screen = display is { } target ? (target.Bounds, target.Work) : Native.MainScreen();
 
     }
 
@@ -88,9 +100,15 @@ public partial class PlayerWindow : Window
         base.OnContentRendered(e);
         if (started) return;
         started = true;
-        tray.Visible = true;
+        if (controller is not null)
+        {
+            Place();
+            return;
+        }
+        tray!.Visible = true;
         Place();
         if (floating && behind) Native.KeepBehind(window);
+        RefreshDisplays();
         layoutTimer.Start();
         mediaTimer.Start();
         try { batteries.Start(); }
@@ -222,7 +240,12 @@ public partial class PlayerWindow : Window
 
     private async void OpenMediaSource(object sender, RoutedEventArgs e)
     {
-        if (openingSource || suppressMediaClick || mediaSourceId is not { } source) return;
+        if (!suppressMediaClick) await (controller ?? this).OpenSourceWindow();
+    }
+
+    private async Task OpenSourceWindow()
+    {
+        if (openingSource || mediaSourceId is not { } source) return;
         openingSource = true;
         try
         {
@@ -259,9 +282,11 @@ public partial class PlayerWindow : Window
         finally { openingSource = false; }
     }
 
-    private async void GoPrevious(object sender, RoutedEventArgs e) => await Send(async s => await s.TrySkipPreviousAsync(), clearPauseOnSuccess: true);
-    private async void GoNext(object sender, RoutedEventArgs e) => await Send(async s => await s.TrySkipNextAsync(), clearPauseOnSuccess: true);
-    private async void TogglePlayback(object sender, RoutedEventArgs e) => await Send(async s =>
+    private async void GoPrevious(object sender, RoutedEventArgs e) => await (controller ?? this).Send(async s => await s.TrySkipPreviousAsync(), clearPauseOnSuccess: true);
+    private async void GoNext(object sender, RoutedEventArgs e) => await (controller ?? this).Send(async s => await s.TrySkipNextAsync(), clearPauseOnSuccess: true);
+    private async void TogglePlayback(object sender, RoutedEventArgs e) => await (controller ?? this).TogglePlayback();
+
+    private Task TogglePlayback() => Send(async s =>
     {
         var info = s.GetPlaybackInfo();
         bool pausing = info.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
@@ -283,6 +308,7 @@ public partial class PlayerWindow : Window
 
     private void ShowBatteries(IReadOnlyList<PeripheralBattery.Reading> devices)
     {
+        batteryReadings = devices;
         Battery.Children.Clear();
         if (devices.Count == 0)
         {
@@ -353,7 +379,7 @@ public partial class PlayerWindow : Window
     private void Place()
     {
         if (window == 0 || !IsLoaded) return;
-        screen = Native.MainScreen();
+        screen = display is { } target ? (target.Bounds, target.Work) : Native.MainScreen();
         if (screen is not { } area) return;
 
         if (!floating && preferences.HideInFullScreen && Native.FullScreenOn(window, area.Bounds))
@@ -369,7 +395,7 @@ public partial class PlayerWindow : Window
 
         if (!floating)
         {
-            Native.KeepDockVisible(window, area.Bounds, area.Work, width, height, dpi.DpiScaleX);
+            Native.KeepDockVisible(window, area.Bounds, area.Work, width, height, dpi.DpiScaleX, display?.Handle ?? 0);
         }
         else if (floatingPosition is { } position)
         {
@@ -493,7 +519,12 @@ public partial class PlayerWindow : Window
         BuildMenus();
         Place();
         if (floating && behind && window != 0) Native.KeepBehind(window);
-        if (started) _ = RefreshMedia();
+        if (controller is null && started)
+        {
+            RefreshDisplays();
+            foreach (var copy in additionalDisplays.Values) copy.CopyDisplaySettings();
+            _ = RefreshMedia();
+        }
     }
 
     private record Option(string Label, bool Checked = false, Action? Run = null, bool Enabled = true, Option[]? Children = null);
@@ -537,15 +568,20 @@ public partial class PlayerWindow : Window
 
     private void BuildMenus()
     {
-        ContextMenu ??= new System.Windows.Controls.ContextMenu();
-        ContextMenu.Items.Clear();
+        BuildWindowMenu((controller ?? this).Options());
+        if (trayMenu is null) return;
         foreach (var old in trayMenu.Items.Cast<Forms.ToolStripItem>().ToArray()) old.Dispose();
         trayMenu.Items.Clear();
-        foreach (var option in Options())
-        {
-            ContextMenu.Items.Add(WindowOption(option));
-            trayMenu.Items.Add(TrayOption(option));
-        }
+        var options = Options();
+        foreach (var option in options) trayMenu.Items.Add(TrayOption(option));
+        foreach (var copy in additionalDisplays.Values) copy.BuildWindowMenu(options);
+    }
+
+    private void BuildWindowMenu(Option[] options)
+    {
+        ContextMenu ??= new System.Windows.Controls.ContextMenu();
+        ContextMenu.Items.Clear();
+        foreach (var option in options) ContextMenu.Items.Add(WindowOption(option));
     }
 
     private static System.Windows.Controls.MenuItem WindowOption(Option option)
