@@ -52,7 +52,7 @@
         <Button x:Name="OpenSource" Width="Auto" Height="Auto" Opacity="1" FontFamily="Segoe UI"
                 IsEnabled="False" Click="OpenMediaSource" AutomationProperties.Name="Abrir aplicativo ou aba da mídia"
                 PreviewMouseLeftButtonDown="StartMediaGesture" PreviewMouseMove="MoveMediaGesture"
-                PreviewMouseLeftButtonUp="EndMediaGesture">
+                PreviewMouseLeftButtonUp="EndMediaGesture" MouseEnter="ShowSeekFlyout" MouseLeave="ScheduleSeekDismiss">
           <StackPanel x:Name="MediaInfo" Orientation="Horizontal">
             <Border x:Name="ArtworkFrame" Width="27" Height="27" Margin="4,0" CornerRadius="4" ClipToBounds="True" Background="#465466">
               <Grid>

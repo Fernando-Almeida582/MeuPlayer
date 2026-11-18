@@ -1,4 +1,4 @@
-# Meu Player 1.3.6
+# Meu Player 1.4.2
 
 Widget de mídia para Windows 10 e 11. Controla a sessão de mídia ativa exposta ao sistema por aplicativos como Spotify e navegadores. A interface mostra faixa, artista e capa quando o aplicativo disponibiliza esses dados.
 
@@ -20,9 +20,19 @@ Em **Tema → Adaptativo**, o widget usa as cores da capa atual para escolher o 
 
 Clique na capa ou no título para trazer a janela do aplicativo de origem para frente. Se a mídia estiver em um navegador compatível, o widget procura uma aba aberta com o mesmo título. Quando o título do anúncio não coincide com o do vídeo, o widget tenta localizar a aba do YouTube pelo indicador de reprodução de áudio. Se houver dúvida sobre a aba, ele traz a janela do navegador para frente. A busca usa os nomes acessíveis das abas abertas e acontece apenas ao clicar. Não instala extensão, não grava os nomes das abas e não abre links nem faz buscas na internet.
 
+## Escolher a posição da mídia
+
+Passe o mouse sobre a capa ou o título para abrir a barra de progresso. Clique ou arraste na barra para pular para a posição desejada. A barra aparece quando o aplicativo de origem permite mudar a posição pelo Windows. O clique na própria capa ou no título continua abrindo o aplicativo ou a aba de origem.
+
+## Letra da faixa
+
+Marque **Exibir → Exibir letra da faixa** para mostrar a linha sincronizada no lugar do título. O artista, a capa, os controles e a barra de progresso continuam disponíveis. Quando não há letra sincronizada ou o aplicativo de origem não informa a posição, o widget mostra o título normalmente. O mesmo trecho é compartilhado entre os monitores.
+
+Com a opção habilitada, o widget procura a faixa no LRCLIB usando título, artista e, quando disponíveis, álbum e duração. Arquivos `.lrc` associados em versões anteriores continuam tendo prioridade. A busca começa quando a faixa fornece posição e artista. O temporizador das linhas só funciona quando há letra sincronizada e a mídia está tocando.
+
 ## Segurança e dados
 
-O aplicativo usa APIs locais do Windows com os privilégios da conta atual. O código não inclui telemetria, comunicação de rede, atualizador nem hooks globais. **Iniciar com o Windows** é opcional e grava uma entrada de inicialização para a conta atual apenas quando você escolhe a opção no menu. Para mover o programa com a opção ativa, desative-a, mova a pasta e ative-a novamente a partir do novo local. O programa consulta o alinhamento da barra de tarefas no Registro em modo somente leitura. As preferências de aparência e posição são gravadas quando você muda uma opção em **%LocalAppData%\MeuPlayer\preferencias.json**.
+O aplicativo usa APIs locais do Windows com os privilégios da conta atual. O código não inclui telemetria, atualizador nem hooks globais. Quando **Exibir letra da faixa** está ativa, a busca envia ao LRCLIB via HTTPS somente os dados da faixa usados na consulta. O aplicativo não acessa suas contas, credenciais ou cookies do Spotify ou do YouTube. **Iniciar com o Windows** é opcional e grava uma entrada de inicialização para a conta atual apenas quando você escolhe a opção no menu. Para mover o programa com a opção ativa, desative-a, mova a pasta e ative-a novamente a partir do novo local. O programa consulta o alinhamento da barra de tarefas no Registro em modo somente leitura. As preferências de aparência e posição são gravadas quando você muda uma opção em **%LocalAppData%\MeuPlayer\preferencias.json**.
 
 A leitura de bateria usa os níveis que o Windows disponibiliza para dispositivos Bluetooth conectados. Esta versão não inclui espectro de áudio ou comunicação com controles e receptores por protocolos proprietários.
 

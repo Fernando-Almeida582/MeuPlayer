@@ -74,6 +74,8 @@ public partial class PlayerWindow : Window
             layoutTimer.Stop();
             mediaTimer.Stop();
             batteryTimer.Stop();
+            seekFlyout?.Close();
+            inlineLyrics?.Dispose();
             CloseAdditionalDisplays();
             batteries.Dispose();
             tray.Dispose();
@@ -132,28 +134,34 @@ public partial class PlayerWindow : Window
             if (closed) return;
             if (session is null)
             {
-                Track.Text = "Sem mídia ativa";
+                trackTitle = "Sem mídia ativa";
+                ShowLyricLine(null);
                 Artist.Text = "Meu Player";
                 OpenSource.ToolTip = null;
                 OpenSource.IsEnabled = false;
                 mediaSourceId = null;
                 SetControls(null);
+                UpdateMediaTools(null);
                 artworkKey = null;
                 SetArtwork(null);
                 return;
             }
 
-            SetControls(session.GetPlaybackInfo(), session.SourceAppUserModelId);
+            var playback = session.GetPlaybackInfo();
+            SetControls(playback, session.SourceAppUserModelId);
             var metadata = await session.TryGetMediaPropertiesAsync();
             if (closed) return;
-            Track.Text = LimitText(metadata.Title, "Mídia ativa");
+            if (!mediaVisible) return;
+            trackTitle = LimitText(metadata.Title, "Mídia ativa");
+            UpdateMediaTools(session, metadata, playback);
+            Track.Text = lyricLine ?? trackTitle;
             Artist.Text = LimitText(metadata.Artist, "Sessão do Windows");
             mediaSourceId = session.SourceAppUserModelId;
             mediaSourceTitle = metadata.Title ?? "";
             mediaIsAdvertisement = MediaSource.IsAdvertisement(mediaSourceTitle, metadata.Artist ?? "");
             OpenSource.IsEnabled = !string.IsNullOrWhiteSpace(mediaSourceId);
-            OpenSource.ToolTip = "Abrir origem da mídia\n" + Track.Text + "\n" + Artist.Text;
-            string key = string.Join("\u001f", session.SourceAppUserModelId, Track.Text, Artist.Text, metadata.AlbumTitle);
+            OpenSource.ToolTip = "Abrir origem da mídia\n" + trackTitle + "\n" + Artist.Text;
+            string key = string.Join("\u001f", session.SourceAppUserModelId, trackTitle, Artist.Text, metadata.AlbumTitle);
             if (key == artworkKey) return;
             artworkKey = key;
             SetArtwork(null);
@@ -177,7 +185,8 @@ public partial class PlayerWindow : Window
             if (!closed && manager is null)
             {
                 SetControls(null);
-                Track.Text = "Mídia indisponível";
+                trackTitle = "Mídia indisponível";
+                ShowLyricLine(null);
             }
         }
         finally { refreshingMedia = false; }
@@ -240,7 +249,10 @@ public partial class PlayerWindow : Window
 
     private async void OpenMediaSource(object sender, RoutedEventArgs e)
     {
-        if (!suppressMediaClick) await (controller ?? this).OpenSourceWindow();
+        if (suppressMediaClick) return;
+        var owner = controller ?? this;
+        owner.seekFlyout?.Close();
+        await owner.OpenSourceWindow();
     }
 
     private async Task OpenSourceWindow()
@@ -384,7 +396,11 @@ public partial class PlayerWindow : Window
 
         if (!floating && preferences.HideInFullScreen && Native.FullScreenOn(window, area.Bounds))
         {
-            if (IsVisible) Hide();
+            if (IsVisible)
+            {
+                (controller ?? this).seekFlyout?.CloseIfTarget(OpenSource);
+                Hide();
+            }
             return;
         }
         if (!IsVisible) Show();
@@ -413,6 +429,7 @@ public partial class PlayerWindow : Window
     {
         if (floating == enabled) return;
         RememberPosition();
+        seekFlyout?.Close();
         floating = enabled;
         if (floating && screen is { } area)
             floatingPosition = preferences.X is int x && preferences.Y is int y ? (x, y) :
@@ -442,6 +459,7 @@ public partial class PlayerWindow : Window
 
         mediaDragStart = null;
         suppressMediaClick = true;
+        (controller ?? this).seekFlyout?.Close();
         e.Handled = true;
         OpenSource.ReleaseMouseCapture();
         try
@@ -502,7 +520,7 @@ public partial class PlayerWindow : Window
         ArtworkFrame.Width = ArtworkFrame.Height = portrait ? 52 : 27;
         ArtworkFrame.Margin = portrait ? new Thickness(0, 5, 0, 6) : new Thickness(4, 0, 4, 0);
         ArtworkFrame.HorizontalAlignment = portrait ? System.Windows.HorizontalAlignment.Center : System.Windows.HorizontalAlignment.Stretch;
-        MediaText.Width = portrait ? 108 : 143;
+        UpdateTrackWidth();
         MediaText.Margin = portrait ? new Thickness(1, 0, 1, 3) : new Thickness(3, 0, 5, 0);
         Track.TextAlignment = Artist.TextAlignment = portrait ? TextAlignment.Center : TextAlignment.Left;
         Track.TextWrapping = portrait ? TextWrapping.Wrap : TextWrapping.NoWrap;
@@ -513,6 +531,7 @@ public partial class PlayerWindow : Window
         Media.Orientation = Layout.Orientation;
         MediaInfo.Orientation = Layout.Orientation;
         Media.Visibility = mediaVisible ? Visibility.Visible : Visibility.Collapsed;
+        if (!mediaVisible) StopInlineLyrics();
         Topmost = !floating || !behind;
         Battery.Visibility = batteryVisible ? Visibility.Visible : Visibility.Collapsed;
         ApplyTheme();
@@ -543,7 +562,8 @@ public partial class PlayerWindow : Window
             new("Controles de mídia", mediaVisible, () => ChangeOption(() => mediaVisible = !mediaVisible), batteryVisible),
             new("Bateria dos dispositivos", batteryVisible, () => ChangeOption(() => batteryVisible = !batteryVisible), mediaVisible),
             new("Ocultar em tela cheia (fixo)", preferences.HideInFullScreen,
-                () => ChangeOption(() => preferences.HideInFullScreen = !preferences.HideInFullScreen), !floating)
+                () => ChangeOption(() => preferences.HideInFullScreen = !preferences.HideInFullScreen), !floating),
+            new("Exibir letra da faixa", preferences.ShowTrackLyrics, ToggleTrackLyrics)
         ]),
         new("Tema", Children: PlayerTheme.All.Select((theme, index) =>
             new Option(theme.Name, preferences.Theme == index, () => ChangeOption(() => preferences.Theme = index))).ToArray()),

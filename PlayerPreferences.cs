@@ -11,6 +11,7 @@ internal sealed class PlayerPreferences
     public bool Behind { get; set; }
     public bool MediaVisible { get; set; } = true;
     public bool BatteryVisible { get; set; } = true;
+    public bool ShowTrackLyrics { get; set; }
     public bool HideInFullScreen { get; set; }
     public int Theme { get; set; }
     public int? X { get; set; }

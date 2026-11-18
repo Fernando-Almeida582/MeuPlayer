@@ -40,7 +40,11 @@ public partial class PlayerWindow
             {
                 copy = new PlayerWindow(this, target);
                 additionalDisplays.Add(handle, copy);
-                copy.Closed += (_, _) => additionalDisplays.Remove(handle);
+                copy.Closed += (_, _) =>
+                {
+                    seekFlyout?.CloseIfTarget(copy.OpenSource);
+                    additionalDisplays.Remove(handle);
+                };
                 copy.Show();
             }
             copy.display = target;
@@ -66,6 +70,8 @@ public partial class PlayerWindow
     private void CopyDisplayState()
     {
         var source = controller!;
+        trackTitle = source.trackTitle;
+        if (lyricLine != source.lyricLine) ShowLyricLine(source.lyricLine);
         Track.Text = source.Track.Text;
         Artist.Text = source.Artist.Text;
         OpenSource.IsEnabled = source.OpenSource.IsEnabled;
