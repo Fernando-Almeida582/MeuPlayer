@@ -9,11 +9,13 @@ internal sealed class PlayerPreferences
     public bool Floating { get; set; }
     public bool Vertical { get; set; }
     public bool Behind { get; set; }
+    public bool DockBehind { get; set; }
+    public int WindowBehaviorVersion { get; set; }
     public bool MediaVisible { get; set; } = true;
     public bool BatteryVisible { get; set; } = true;
     public bool DockRight { get; set; }
     public bool ShowTrackLyrics { get; set; }
-    public bool HideInFullScreen { get; set; }
+    public bool HideInFullScreen { get; set; } = true;
     public int Theme { get; set; }
     public int? X { get; set; }
     public int? Y { get; set; }
@@ -27,10 +29,20 @@ internal sealed class PlayerPreferences
         try
         {
             if (new FileInfo(FilePath).Length <= 4096)
-                return JsonSerializer.Deserialize<PlayerPreferences>(File.ReadAllText(FilePath)) ?? new();
+                return Upgrade(JsonSerializer.Deserialize<PlayerPreferences>(File.ReadAllText(FilePath)) ?? new());
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { }
-        return new();
+        return Upgrade(new());
+    }
+
+    internal static PlayerPreferences Upgrade(PlayerPreferences preferences)
+    {
+        if (preferences.WindowBehaviorVersion < 1)
+        {
+            preferences.HideInFullScreen = true;
+            preferences.WindowBehaviorVersion = 1;
+        }
+        return preferences;
     }
 
     internal void Save()

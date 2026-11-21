@@ -1,4 +1,12 @@
-# Meu Player 1.4.13
+# Meu Player 1.4.14
+
+## Jogos em tela cheia e ordem das janelas
+
+A ocultação em tela cheia no modo fixo vem ativada, inclusive ao carregar preferências das versões anteriores a esta mudança. A detecção considera as bordas da janela e as bordas visíveis fornecidas pelo DWM, permitindo pequenas diferenças de pixels e janelas que ultrapassam o monitor. Cada cópia é ocultada apenas se a janela em primeiro plano cobrir seu monitor. Ao sair da tela cheia ou alternar para uma janela comum, o player volta pelo temporizador de posicionamento, sem exigir um clique. Iniciar e Busca continuam excluídos dessa detecção. A opção **Exibir → Ocultar em tela cheia (fixo)** permanece disponível caso você queira desativar esse comportamento.
+
+Em **Posição → Jogar para trás (fixo)**, o player deixa de ficar sempre no topo e é colocado atrás da janela em primeiro plano, sem tomar o foco. Nesse modo ele permanece fixo dentro da área útil, logo acima da barra, para não ser escondido pela própria barra de tarefas. Se uma janela o cobrir, use o ícone do Meu Player na bandeja para abrir o menu e desmarcar a opção. Ao desmarcar, o encaixe normal e a posição no topo são restaurados. A preferência é compartilhada entre os monitores e independente de **Atrás das janelas (solto)**.
+
+Validação desta mudança: testes de geometria, migração de preferências e ordem Z com janelas nativas de teste. O comportamento com jogos reais, anti-cheat ou tela cheia exclusiva ainda precisa ser conferido em uso.
 
 Baseada na edição executável 1.4.11. No modo fixo, a área da letra expande conforme a largura do texto e o espaço livre da barra de tarefas, respeitando os botões e o relógio. A maior largura necessária é mantida durante a faixa para evitar saltos a cada verso e reiniciada ao mudar de faixa. Quando o espaço é insuficiente, a letra continua com reticências. Cada monitor respeita seu próprio espaço disponível. O layout flutuante permanece com sua largura habitual.
 

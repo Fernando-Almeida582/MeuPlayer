@@ -31,6 +31,8 @@ internal static class Native
     internal static (int X, int Y)? WindowPosition(nint window) =>
         GetWindowRect(window, out var rect) ? (rect.Left, rect.Top) : null;
     [DllImport("dwmapi.dll")] private static extern int DwmGetWindowAttribute(nint window, int attribute, out uint value, int size);
+    [DllImport("dwmapi.dll", EntryPoint = "DwmGetWindowAttribute")]
+    private static extern int DwmGetFrameBounds(nint window, int attribute, out Rect value, int size);
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(nint window);
     [DllImport("user32.dll")] private static extern nint WindowFromPoint(Point point);
     [DllImport("user32.dll")] private static extern nint GetAncestor(nint window, uint flags);
@@ -78,9 +80,21 @@ internal static class Native
     private static bool IsFullScreenWindow(nint foreground, nint ownWindow, Rect screen)
     {
         if (foreground == 0 || foreground == ownWindow || foreground == GetShellWindow() ||
-            !GetWindowRect(foreground, out var rect)) return false;
-        return rect.Left == screen.Left && rect.Top == screen.Top &&
-            rect.Right == screen.Right && rect.Bottom == screen.Bottom && !IsShellSurface(foreground);
+            !IsWindowVisible(foreground) || IsIconic(foreground) ||
+            (DwmGetWindowAttribute(foreground, 14, out uint cloaked, sizeof(uint)) == 0 && cloaked != 0)) return false;
+        bool covers = GetWindowRect(foreground, out var rect) && CoversMonitor(rect, screen);
+        // Visible frame bounds avoid invisible resize borders and use physical pixels.
+        covers |= DwmGetFrameBounds(foreground, 9, out var frame, Marshal.SizeOf<Rect>()) == 0 && CoversMonitor(frame, screen);
+        return covers && !IsShellSurface(foreground);
+    }
+
+    internal static bool CoversMonitor(Rect window, Rect screen)
+    {
+        const int tolerance = 2;
+        return window.Right > window.Left && window.Bottom > window.Top &&
+            screen.Right > screen.Left && screen.Bottom > screen.Top &&
+            (long)window.Left <= (long)screen.Left + tolerance && (long)window.Top <= (long)screen.Top + tolerance &&
+            (long)window.Right >= (long)screen.Right - tolerance && (long)window.Bottom >= (long)screen.Bottom - tolerance;
     }
 
     private static bool IsShellSurface(nint window)
@@ -151,13 +165,18 @@ internal static class Native
         return (work.Left + margin, work.Bottom - height - margin);
     }
 
-    internal static void KeepDockVisible(nint window, Rect screen, Rect work, int width, int height, double scale, nint monitor, TaskbarSpace.Slot? slot = null, bool right = false)
+    internal static void KeepDockVisible(nint window, Rect screen, Rect work, int width, int height, double scale, nint monitor, TaskbarSpace.Slot? slot = null, bool right = false, bool behind = false)
     {
         nint taskbar = TaskbarOn(monitor);
         var (x, y) = Dock(screen, work, width, height, scale, taskbar);
         if (right) x = screen.Right - width - (int)(8 * scale);
         if (slot is { } available) x = available.X;
         var (safeX, safeY) = InsideWorkArea(work, x, y, width, height, Math.Max(2, (int)(4 * scale)));
+        if (behind)
+        {
+            PresentDockBehind(window, safeX, safeY, GetForegroundWindow());
+            return;
+        }
         const int cloakedAttribute = 14;
         nint foreground = GetForegroundWindow();
         bool foregroundIsVisible = IsWindowVisible(foreground) &&
@@ -207,6 +226,25 @@ internal static class Native
     }
 
     internal static void KeepBehind(nint window) => SetWindowPos(window, 1, 0, 0, 0, 0, 0x13);
+
+    internal static void PresentDockBehind(nint window, int x, int y, nint foreground)
+    {
+        const uint flags = 0x0001 | 0x0010 | 0x0040; // NOSIZE, NOACTIVATE, SHOWWINDOW
+        if (IsIconic(window)) ShowWindow(window, 4);
+        // Demote first: inserting after a topmost foreground would promote us again.
+        if ((GetWindowLong(window, -20) & 8) != 0)
+            SetWindowPos(window, -2, x, y, 0, 0, flags);
+        if (foreground != 0 && foreground != window && IsWindowVisible(foreground) &&
+            !IsIconic(foreground) && !IsShellSurface(foreground))
+        {
+            if ((GetWindowLong(foreground, -20) & 8) == 0)
+            {
+                SetWindowPos(window, foreground, x, y, 0, 0, flags);
+                return;
+            }
+        }
+        SetWindowPos(window, 0, x, y, 0, 0, flags | 0x0004); // preserve normal Z-order
+    }
 
     internal static void Move(nint window, int x, int y) => SetWindowPos(window, 0, x, y, 0, 0, 0x15);
 }

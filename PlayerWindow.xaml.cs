@@ -436,7 +436,7 @@ public partial class PlayerWindow : Window
                 UpdateLayout();
                 width = (int)Math.Ceiling(ActualWidth * dpi.DpiScaleX);
             }
-            Native.KeepDockVisible(window, area.Bounds, area.Work, width, height, dpi.DpiScaleX, display?.Handle ?? 0, slot, preferences.DockRight);
+            Native.KeepDockVisible(window, area.Bounds, area.Work, width, height, dpi.DpiScaleX, display?.Handle ?? 0, slot, preferences.DockRight, preferences.DockBehind);
         }
         else if (floatingPosition is { } position)
         {
@@ -565,7 +565,7 @@ public partial class PlayerWindow : Window
         MediaInfo.Orientation = Layout.Orientation;
         Media.Visibility = mediaVisible ? Visibility.Visible : Visibility.Collapsed;
         if (!mediaVisible) StopInlineLyrics();
-        Topmost = !floating || !behind;
+        Topmost = floating ? !behind : !preferences.DockBehind;
         Battery.Visibility = batteryVisible ? Visibility.Visible : Visibility.Collapsed;
         ApplyTheme();
         BuildMenus();
@@ -588,6 +588,7 @@ public partial class PlayerWindow : Window
             new("Fixar à esquerda", !floating && !preferences.DockRight, () => SetDockSide(false)),
             new("Fixar à direita", !floating && preferences.DockRight, () => SetDockSide(true)),
             new("Solto na tela (arrastar)", floating, () => SetFloating(true)),
+            new("Jogar para trás (fixo)", preferences.DockBehind, () => ChangeOption(() => preferences.DockBehind = !preferences.DockBehind), !floating),
             new("Layout vertical (solto)", vertical, () => ChangeOption(() => vertical = !vertical), floating),
             new("Atrás das janelas (solto)", behind, () => ChangeOption(() => behind = !behind), floating)
         ]),
